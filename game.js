@@ -14,6 +14,11 @@
     sceneryReady = false;
   };
   scenery.src = "assets/sky-castle.png";
+  const mageSprite = new Image();
+  let spriteReady = false;
+  mageSprite.onload = () => { spriteReady = mageSprite.naturalWidth === 1728 && mageSprite.naturalHeight === 1152; };
+  mageSprite.onerror = () => { spriteReady = false; };
+  mageSprite.src = "assets/mage-snowman.png";
   const {
     weapons,
     skills,
@@ -93,6 +98,8 @@
       upgrades: [],
       critMultiplier: 1.5,
       hurt: 0,
+      casts: [],
+      attackTotal: 0.22,
       animationTime: 0,
       x: 140,
       y: 390,
@@ -329,12 +336,25 @@
   }
   // Input actions only consume shared player cooldowns; equipment never owns timers.
   function cast(spec) {
-    p.attack = 0.22;
+    p.attackTotal = spec.skill === "basic" ? 0.22 : 0.30;
+    p.attack = p.attackTotal;
+    // Capture combat values on input; release after two anticipation frames.
+    p.casts.push({ spec, delay: p.attackTotal / 3 });
+  }
+  function releaseCast(spec) {
+    if (spec.skill === "frost") {
+      effects.push({ kind: "frost", x: spec.x, y: spec.y, life: 0.65, max: 0.65 });
+      for (const e of enemies)
+        if (Math.hypot(e.x - spec.x, (e.y - spec.y) * 1.6) < skills.frost.range)
+          hit(e, spec, 8, e.type === "boss" ? 0.7 : 1.8);
+      tone(880, 0.3, "sine");
+      return;
+    }
     if (spec.shape === "projectile") {
       shots.push({
         ...spec,
-        x: p.x + p.face * 16,
-        y: p.y,
+        x: spec.x + spec.face * 16,
+        y: spec.y,
         vx: spec.face * spec.speed,
         life: spec.range / spec.speed,
         hit: new Set(),
@@ -402,13 +422,7 @@
     }
     if (key === "KeyU" && p.cd.frost <= 0) {
       p.cd.frost = cooldown(p, skills.frost.cooldown);
-      p.attack = 0.3;
-      effects.push({ kind: "frost", x: p.x, y: p.y, life: 0.65, max: 0.65 });
-      const spec = attackSpec(p, "frost");
-      for (const e of enemies)
-        if (Math.hypot(e.x - p.x, (e.y - p.y) * 1.6) < skills.frost.range)
-          hit(e, spec, 8, e.type === "boss" ? 0.7 : 1.8);
-      tone(880, 0.3, "sine");
+      cast(attackSpec(p, "frost"));
     }
     if (key === "KeyH" && p.potions > 0 && p.hp < 160) {
       p.potions--;
@@ -554,6 +568,10 @@
     p.animationTime += dt;
     p.hitCd = Math.max(0, p.hitCd - dt);
     p.attack -= dt;
+    for (const pending of p.casts) pending.delay -= dt;
+    const due = p.casts.filter(pending => pending.delay <= 0);
+    p.casts = p.casts.filter(pending => pending.delay > 0);
+    for (const pending of due) releaseCast(pending.spec);
     p.dash -= dt;
     for (const k in p.cd) p.cd[k] = Math.max(0, p.cd[k] - dt);
     if (time > comboUntil) breakCombo("超时");
@@ -859,6 +877,37 @@
       text("清场开门", 910, 279, 11, "#e1dbbd", "center");
     }
   }
+  function spriteFrame(preview = false) {
+    const state = preview ? "idle" : animationState(p).name;
+    if (state === "defeat") return 21;
+    if (state === "hurt") return p.hurt > 0.125 ? 20 : 21;
+    if (state === "dash") return p.dash > 0.1 ? 22 : 23;
+    if (state === "jump") return p.vz > 0 ? 18 : 19;
+    if (state === "cast") return 12 + Math.min(5, Math.max(0, Math.floor((1 - p.attack / p.attackTotal) * 6)));
+    if (state === "walk") return 6 + Math.floor(Math.abs(p.walk) * 0.8) % 6;
+    return Math.floor(time * 5) % 6;
+  }
+  function drawMageWeapon(x, y, angle) {
+    const weapon = weapons[p.weapon];
+    c.save(); c.translate(x, y); c.rotate(p.weapon === "broom" ? -angle : angle);
+    if (p.weapon === "staff") {
+      rect(-3, -38, 6, 70, "#302742"); rect(-1, -36, 2, 66, "#bb8e63");
+      poly([[-10,-42],[0,-56],[10,-42],[0,-29]], "#35284f");
+      poly([[-7,-42],[0,-52],[7,-42],[0,-33]], weapon.color);
+      rect(-2,-48,3,9,"#f6e6ff"); rect(-5,-29,10,4,"#e5b96b");
+    } else if (p.weapon === "wand") {
+      rect(-2,-25,4,44,"#473348"); rect(-1,-24,2,41,"#d4b080");
+      poly([[0,-40],[3,-32],[10,-29],[3,-26],[0,-18],[-3,-26],[-10,-29],[-3,-32]], weapon.color);
+      rect(-2,-32,4,6,"#fff7d8");
+    } else {
+      rect(-3,-26,6,64,"#43333b"); rect(-1,-25,2,63,"#c69b69");
+      poly([[-7,20],[7,20],[14,43],[9,46],[-13,43]], "#604547");
+      poly([[-5,21],[5,21],[11,40],[7,42],[-10,40]], "#e3bd7b");
+      for (let i = -6; i <= 6; i += 4) rect(i,29,1,12,"#977049");
+      rect(-7,20,14,4,"#ce4b57");
+    }
+    c.restore();
+  }
   function snowman(
     x,
     y,
@@ -874,6 +923,20 @@
     c.translate(Math.round(x), Math.round(y - z));
     c.scale(face * scale, scale);
     if (inv > 0 && Math.floor(time * 16) % 2) c.globalAlpha = 0.5;
+    if (spriteReady) {
+      const index = spriteFrame(scale !== 1);
+      const meta = SkySpriteData.frames[index], unit = SkySpriteData.scale;
+      const hx = (meta.hand[0] - SkySpriteData.anchor[0]) * unit;
+      const hy = (meta.hand[1] - SkySpriteData.anchor[1]) * unit;
+      const phase = p.attack > 0 ? Math.min(5, Math.floor((1 - p.attack / p.attackTotal) * 6)) : -1;
+      const angle = phase < 0 ? 0.12 : [-0.45, -0.65, 0.35, 1.05, 0.5, 0.15][phase];
+      drawMageWeapon(hx, hy, angle);
+      c.imageSmoothingEnabled = true;
+      c.drawImage(mageSprite, meta.x, meta.y, 288, 288,
+        -SkySpriteData.anchor[0] * unit, -SkySpriteData.anchor[1] * unit, 288 * unit, 288 * unit);
+      c.restore();
+      return;
+    }
     const bob = Math.sin(walk) * 2;
     c.translate(0, bob);
     const R = (x, y, w, h, col) => rect(x, y, w, h, col);
@@ -1344,6 +1407,8 @@
   // Read-only snapshot for reproducible browser QA. No state mutation or cheats.
   window.skySnowSnapshot = () => ({
     sceneryReady,
+    spriteReady,
+    spriteFrame: spriteFrame(),
     animation: animationState(p),
     events: combatEvents.map((e) => ({ ...e })),
     weapon: weapons[p.weapon],
