@@ -93,3 +93,56 @@ test("animation interface handles defeat, hurt, dash, jump, casting and movement
     assert.equal(C.animationState(p).name, name);
   }
 });
+test("defense formula, critical threshold and caps use deterministic RNG", () => {
+  const p = { ...player(), critChance: 0.1, critMultiplier: 1.5 };
+  assert.equal(C.calculateDamage(C.attackSpec(p, "basic", () => 0.1)), 30);
+  assert.equal(C.calculateDamage(C.attackSpec(p, "basic", () => 0.099)), 45);
+  assert.equal(C.calculateDamage(C.attackSpec(p, "special", () => 0.5), 25), 50);
+  assert.equal(C.calculateDamage(C.attackSpec(p, "basic", () => 0.5), -10), 30);
+  assert.equal(C.calculateDamage(C.attackSpec(p, "basic", () => 0.5), 999), 15);
+  assert.equal(C.attackSpec({ ...p, critChance: 0 }, "basic", () => 0).critical, false);
+  assert.equal(C.attackSpec({ ...p, critChance: 2 }, "basic", () => 0.75).critical, false);
+});
+test("all weapons deliver actual growth damage, overkill counts only remaining HP", () => {
+  for (const weapon of Object.keys(C.weapons)) {
+    const p = { ...player(), weapon };
+    const before = C.calculateDamage(C.attackSpec(p, "basic", () => 1), 10);
+    C.applyUpgrade(p, "power");
+    const spec = C.attackSpec(p, "basic", () => 1);
+    const target = { hp: 100, defense: 10 };
+    const dealt = C.applyDamage(target, spec);
+    assert(dealt.applied > before);
+    assert.equal(target.hp, 100 - dealt.applied);
+    const low = { hp: 3, defense: 10 };
+    assert.equal(C.applyDamage(low, spec).applied, 3);
+    assert.equal(low.hp, 0);
+    assert.equal(C.applyDamage(low, spec).applied, 0);
+  }
+});
+test("upgrade tradeoffs, upper/lower limits and cooldown floor", () => {
+  for (const u of C.upgrades) {
+    const p = { ...player(), attackScale: 1, critChance: 0.1, haste: 0 };
+    const before = C.stats(p);
+    C.applyUpgrade(p, u.id);
+    const after = C.stats(p);
+    if (u.id === "power") {
+      assert(after.attack > before.attack);
+      assert(after.cooldownScale > before.cooldownScale);
+    } else assert(after.attack < before.attack);
+    for (let i = 0; i < 100; i++) C.applyUpgrade(p, u.id);
+    const v = C.stats(p);
+    assert(v.attack >= C.weapons.staff.attack * 0.5 && v.attack <= C.weapons.staff.attack * 2.5);
+    assert(v.critChance <= 0.75 && v.critMultiplier <= 2.5);
+    assert(v.cooldownScale >= 0.4 && v.cooldownScale <= 1.5);
+    assert(C.cooldown(p, -10) >= 0.1);
+    assert(C.cooldown(p, 7) >= 2.8 - 1e-9);
+  }
+  assert.equal(C.applyUpgrade(player(), "bad"), false);
+  assert.deepEqual([1, 3, 8, 15, 30].map(C.comboRank), ["D · 初击", "C · 起势", "B · 熟练", "A · 华丽", "S · 超凡"]);
+});
+test("difficulty changes pressure as well as HP and armor", () => {
+  for (let i = 1; i < 3; i++) {
+    const a = C.difficulties[i - 1], b = C.difficulties[i];
+    assert(b.hp > a.hp && b.dmg > a.dmg && b.speed > a.speed && b.wind < a.wind && b.defense > a.defense);
+  }
+});

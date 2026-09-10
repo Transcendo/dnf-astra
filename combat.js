@@ -75,6 +75,48 @@ const SkyCombat = (() => {
     dash: { name: "冲刺", cooldown: 1.2 },
     jump: { name: "跳跃", cooldown: 0.95 },
   };
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const difficulties = [
+    { name: "普通", hp: 1, dmg: 0.85, speed: 0.9, wind: 1.15, defense: 0 },
+    { name: "冒险", hp: 1.2, dmg: 1.25, speed: 1.12, wind: 0.9, defense: 8 },
+    { name: "王者", hp: 1.4, dmg: 1.7, speed: 1.4, wind: 0.7, defense: 16 },
+  ];
+  const defenses = { dragon: 0, mage: 0, golem: 15, boss: 10 };
+  const upgrades = [
+    { id: "power", name: "重铸 · 强攻", description: "攻击 +25% 基础值；技能冷却 +8% 基础值", attack: 0.25, crit: 0, haste: -0.08 },
+    { id: "crit", name: "星晶 · 会心", description: "暴击率 +15 个百分点；暴伤 +0.2 倍；攻击 −5% 基础值", attack: -0.05, crit: 0.15, critDamage: 0.2, haste: 0 },
+    { id: "haste", name: "轻羽 · 速咏", description: "技能冷却 −20% 基础值；攻击 −5% 基础值（不影响普攻间隔）", attack: -0.05, crit: 0, haste: 0.2 },
+  ];
+  function stats(player) {
+    return {
+      attack: weapons[player.weapon].attack * clamp(player.attackScale ?? 1, 0.5, 2.5),
+      critChance: clamp(player.critChance ?? 0, 0, 0.75),
+      critMultiplier: clamp(player.critMultiplier ?? 1.5, 1, 2.5),
+      cooldownScale: clamp(1 - (player.haste ?? 0), 0.4, 1.5),
+    };
+  }
+  function cooldown(player, base) {
+    return Math.max(0.1, base * stats(player).cooldownScale);
+  }
+  function applyUpgrade(player, id) {
+    const u = upgrades.find(u => u.id === id);
+    if (!u) return false;
+    player.attackScale = clamp((player.attackScale ?? 1) + u.attack, 0.5, 2.5);
+    player.critChance = clamp((player.critChance ?? 0) + u.crit, 0, 0.75);
+    player.critMultiplier = clamp((player.critMultiplier ?? 1.5) + (u.critDamage ?? 0), 1, 2.5);
+    player.haste = clamp((player.haste ?? 0) + u.haste, -0.5, 0.6);
+    (player.upgrades ??= []).push(id);
+    return true;
+  }
+  function applyDamage(target, spec) {
+    const damage = calculateDamage(spec, target.defense ?? 0);
+    const applied = Math.min(Math.max(0, target.hp), damage);
+    target.hp = Math.max(0, target.hp - applied);
+    return { damage, applied };
+  }
+  function comboRank(combo) {
+    return combo >= 30 ? "S · 超凡" : combo >= 15 ? "A · 华丽" : combo >= 8 ? "B · 熟练" : combo >= 3 ? "C · 起势" : "D · 初击";
+  }
   // Freeze recursively so extensions cannot accidentally mutate shared configuration.
   function freeze(value) {
     Object.values(value).forEach((v) => {
@@ -84,6 +126,9 @@ const SkyCombat = (() => {
   }
   freeze(weapons);
   freeze(skills);
+  freeze(difficulties);
+  freeze(defenses);
+  freeze(upgrades);
   function switchWeapon(player, id) {
     if (!weapons[id] || player.weapon === id) return false;
     player.weapon = id;
@@ -103,8 +148,9 @@ const SkyCombat = (() => {
       skill === "basic"
         ? [1, 1.12, 1.35][player.chain || 0]
         : config.multiplier;
-    const attack = weapon.attack * (player.attackScale ?? 1);
-    const critical = rng() < (player.critChance ?? 0);
+    const panel = stats(player);
+    const attack = panel.attack;
+    const critical = rng() < panel.critChance;
     return {
       ...config,
       weapon: player.weapon,
@@ -112,20 +158,20 @@ const SkyCombat = (() => {
       attack,
       multiplier,
       critical,
-      criticalMultiplier: player.critMultiplier ?? 1.5,
+      criticalMultiplier: panel.critMultiplier,
       face: player.face,
       x: player.x,
       y: player.y,
       color: weapon.color,
     };
   }
-  function calculateDamage(spec) {
+  function calculateDamage(spec, defense = 0) {
     return Math.max(
       0,
       Math.round(
         spec.attack *
           spec.multiplier *
-          (spec.critical ? spec.criticalMultiplier : 1),
+          (spec.critical ? spec.criticalMultiplier : 1) * 100 / (100 + clamp(defense, 0, 100)),
       ),
     );
   }
@@ -176,6 +222,7 @@ const SkyCombat = (() => {
   return Object.freeze({
     weapons,
     skills,
+    difficulties, defenses, upgrades, stats, cooldown, applyUpgrade, applyDamage, comboRank,
     switchWeapon,
     attackSpec,
     calculateDamage,

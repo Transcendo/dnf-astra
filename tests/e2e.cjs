@@ -14,6 +14,14 @@ fs.mkdirSync("test-results", { recursive: true });
   page.on("console", (msg) => {
     if (msg.type() === "error") errors.push(msg.text());
   });
+  await page.addInitScript(() => {
+    let seed = 1616;
+    Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    window.damageAudit = [];
+    window.addEventListener("sky-combat", e => {
+      if (e.detail.type === "damage") window.damageAudit.push(e.detail);
+    });
+  });
   await page.clock.install();
   await page.goto("file://" + path.resolve("锅盖雪人.html"));
   const snap = () => page.evaluate(() => skySnowSnapshot());
@@ -59,6 +67,7 @@ fs.mkdirSync("test-results", { recursive: true });
     if (run) await page.click("#home");
     await page.click(`[data-level="${level}"]`);
     await page.click("#start");
+    await page.evaluate(() => { window.damageAudit = []; });
     let initial = await snap();
     assert.equal(initial.level, level);
     const visited = new Set(),
@@ -69,6 +78,53 @@ fs.mkdirSync("test-results", { recursive: true });
     for (let i = 0; i < 2200; i++) {
       state = await snap();
       visited.add(state.room);
+      if (state.mode === "growth") {
+        await setKeys([]);
+        assert(await page.locator("#growth").isVisible());
+        const frozen = await snap();
+        await page.clock.runFor(2500);
+        await page.keyboard.press("j");
+        await page.keyboard.press("Escape");
+        assert.deepEqual(await snap(), frozen);
+        const choice = ["power", "crit", "haste"][(run + state.room) % 3];
+        const expected = require("../combat.js");
+        const preview = structuredClone(state.player);
+        expected.applyUpgrade(preview, choice);
+        assert.match(await page.locator(`[data-upgrade="${choice}"]`).innerText(), /选择后/);
+        if (run === 0 && state.room === 0) {
+          await page.screenshot({path:"test-results/growth.png"});
+          await page.setViewportSize({width:1024,height:768});
+          await page.screenshot({path:"test-results/growth-1024.png"});
+          for (const card of await page.locator("[data-upgrade]").all()) {
+            const box = await card.boundingBox();
+            assert(box.x >= 0 && box.x + box.width <= 1024 && box.y >= 0 && box.y + box.height <= 768);
+          }
+          await page.setViewportSize({width:1440,height:1000});
+        }
+        if (run === 0 && state.room === 0) await page.keyboard.press("Enter");
+        else await page.click(`[data-upgrade="${choice}"]`);
+        const grown = await snap();
+        assert.equal(grown.mode, "play");
+        assert.equal(grown.player.upgrades.length, state.room + 1);
+        assert.deepEqual(grown.panel, expected.stats(preview));
+        // Weapon switch immediately uses the grown attack, without changing upgrades.
+        for (const [key, weapon] of [["2", "wand"], ["3", "broom"], ["1", "staff"]]) {
+          await page.keyboard.press(key);
+          const switched = await snap();
+          assert.equal(switched.panel.attack, expected.stats({...preview, weapon}).attack);
+        }
+        if (run === 0 && state.room === 0) {
+          await page.clock.runFor(32);
+          await page.screenshot({path:"test-results/grown-panel.png"});
+          await page.clock.runFor(2100);
+          assert.equal((await snap()).combo, 0);
+          assert((await snap()).events.some(e => e.type === "combo-break" && e.reason === "超时"));
+        }
+        const seconds = (await snap()).combatSeconds;
+        await page.clock.runFor(500);
+        assert.equal((await snap()).combatSeconds, seconds);
+        continue;
+      }
       if (state.mode !== "play") break;
       for (const event of state.events)
         if (event.type === "damage") {
@@ -134,13 +190,31 @@ fs.mkdirSync("test-results", { recursive: true });
       seconds: state.clock,
       hp: state.player.hp,
       kills: state.kills,
+      upgrades: state.player.upgrades,
+      totalDamage: state.totalDamage, combatSeconds: state.combatSeconds,
     });
     assert.equal(state.mode, "win", JSON.stringify(result));
+    assert.equal(state.player.upgrades.length, 3);
+    const audit = await page.evaluate(() => window.damageAudit);
+    assert(Math.abs(audit.reduce((sum, e) => sum + e.applied, 0) - state.totalDamage) < 1e-6);
+    assert(audit.some(e => e.critical));
+    if (run === 0) assert(audit.some(e => e.attack > require("../combat.js").weapons[e.weapon].attack));
+    for (const e of audit) {
+      // Full formula is checked using the cast-time critical multiplier emitted by the game.
+      assert.equal(e.damage, require("../combat.js").calculateDamage({...e, criticalMultiplier:e.criticalMultiplier}, e.defense));
+      assert(e.applied <= e.damage && e.applied >= 0);
+    }
+    assert(state.combatSeconds > 0 && state.combatSeconds < state.clock);
+    assert.match(await page.locator("#result-text").innerText(), /总伤害.*有效战斗/s);
     assert.equal(visited.size, 4);
     assert(damageWeapons.has(loadout));
     assert(specialWeapons.has(loadout), JSON.stringify(result));
     await page.click("#retry");
     assert.equal((await snap()).room, 0);
+    assert.deepEqual((await snap()).player.upgrades, []);
+    assert.equal((await snap()).totalDamage, 0);
+    assert.equal((await snap()).combatSeconds, 0);
+    assert.equal((await snap()).panel.attack, 30);
     await page.keyboard.press("Escape");
     await page.click("#home");
     if (run < 8) {
@@ -168,6 +242,7 @@ fs.mkdirSync("test-results", { recursive: true });
   const before = await snap();
   await page.clock.runFor(1000);
   assert.equal((await snap()).clock, before.clock);
+  assert.equal((await snap()).combatSeconds, before.combatSeconds);
   await page.click("#resume");
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   assert.equal((await snap()).mode, "pause");

@@ -1,9 +1,22 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>锅盖雪人 · 云上城</title><style>:root{color-scheme:dark;--bg:#0b1322;--surface:#14233a;--ink:#f4edd6;--gold:#dfb66b;--muted:#9aadc4}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 0,#213b55 0,#0b1322 65%);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;min-height:100vh;display:grid;place-items:center}main{width:min(1200px,96vw);padding:20px 0}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.brand{font-size:21px;font-weight:800;letter-spacing:2px}.brand span{font-size:16px;font-weight:400;color:var(--muted)}button{font:inherit;cursor:pointer;border:1px solid #45556b;background:#18283e;color:var(--ink);padding:10px 18px;transition:background .15s,transform .15s}button:hover{background:#2a405a}button:active{transform:translateY(1px)}button:focus-visible,canvas:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.tools{display:flex;gap:8px}.tools button{font-size:12px;padding:8px 12px}.stage{position:relative;border:1px solid #50617a;box-shadow:0 24px 80px #0007;overflow:hidden;background:#233d56;aspect-ratio:16/9}canvas{display:block;width:100%;height:100%;image-rendering:pixelated;outline:none}.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;padding:4%;background:linear-gradient(90deg,#0b152aee,#0b152ab0 45%,#0b152a05 80%)}.panel{width:450px;max-width:65%;padding:15px}.overline{font-size:12px;letter-spacing:4px;color:var(--gold);margin:0 0 16px}h1{font-size:46px;line-height:1.15;letter-spacing:6px;margin:0 0 18px;text-shadow:3px 3px #0006}h1 span{display:block;color:var(--gold);font-size:30px;letter-spacing:13px;margin-top:8px}.intro{font-size:13px;line-height:1.9;color:#b7c9db}.difficulty{display:flex;gap:8px;margin:23px 0 16px}.difficulty button{flex:1;padding:11px 8px;font-size:14px}.difficulty small{display:block;font-size:10px;margin-top:5px;color:#9aadc4}.difficulty .selected{border-color:var(--gold);color:var(--gold);background:#453d32}.primary{width:100%;background:var(--gold);border:1px solid #ffe2a3;color:#1b2534;font-size:15px;font-weight:800;padding:13px 20px}.primary:hover{background:#f4d494}.primary span{float:right}.hint{font-size:11px;color:#9aadc4;margin-bottom:0}footer{padding-top:18px;color:#b7c9db;text-align:center;font-size:12px;line-height:1.9}footer p{color:#758ba6;font-size:11px;margin:7px 0 0}kbd{font-family:inherit;font-size:10px;background:#1b2b43;border:1px solid #3a4b65;border-bottom:2px solid #52647c;padding:3px 5px;margin-left:9px;color:#e7d8b9}.hidden{display:none!important}#modal{justify-content:center;background:#071122cc;backdrop-filter:blur(4px)}.compact{max-width:80%;text-align:center;background:#14243aeF;border:1px solid #657084;padding:35px}.compact h2{font-size:36px;margin:10px 0 15px}.compact #result-text{font-size:13px;line-height:2;color:#b7c9db;margin-bottom:25px}.secondary{width:100%;margin-top:10px;font-size:12px}@media(max-height:760px){main{width:min(1080px,95vw);padding:10px 0}header{margin-bottom:8px}footer{padding-top:9px}.panel{padding:5px}h1{font-size:38px}.difficulty{margin:15px 0 12px}.intro{margin:8px 0}}@media(max-width:850px){h1{font-size:28px}h1 span{font-size:23px}.overline{margin-bottom:8px;font-size:10px}.intro{font-size:11px}.difficulty{margin:10px 0}.difficulty button{padding:7px 4px}.primary{padding:9px}.hint{font-size:9px}.panel{max-width:70%}footer{font-size:10px}}
+
+#growth{justify-content:center;background:#071122e8}
+.growth-panel{width:850px;max-width:100%;padding:20px;background:#14243a;border:1px solid #dfb66b}
+.growth-panel h2{margin:8px 0;font-size:26px}
+#growth-current{font-size:12px;color:#c3d6e9;line-height:1.7}
+#growth-choices{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}
+#growth-choices button{text-align:left;padding:16px 12px;border-color:#8e805f;line-height:1.7}
+#growth-choices strong{display:block;color:#f5d28c;font-size:17px}
+#growth-choices span{display:block;font-size:12px;min-height:66px;margin:10px 0}
+#growth-choices small{display:block;color:#b8d9ed;font-size:11px}
+#result-text{white-space:pre-line}
+@media(max-height:760px){.compact{padding:18px}.compact h2{font-size:27px}.compact #result-text{margin-bottom:12px;line-height:1.7}.growth-panel{padding:16px}}
 </style></head>
 <body><main><header><div class="brand">锅盖雪人 <span>· 云上城</span></div><div class="tools"><button id="sound" aria-pressed="false">音效：开</button><button id="pause">暂停 Esc</button></div></header>
 <section class="stage" aria-label="游戏区域"><canvas id="game" width="960" height="540" tabindex="0" aria-label="横版战斗游戏，WASD移动，J攻击，K跳跃，L武器技能，1/2/3切换武器，U冰环，空格冲刺"></canvas>
 <div class="overlay" id="menu"><div class="panel"><p class="overline">一口锅盖，一路向上。</p><h1>锅盖雪人<span>云上城</span></h1><p class="intro">穿过云海中的四座回廊，挑战雷霆城主。<br>一段小小的像素地下城冒险。</p><div class="difficulty" role="group" aria-label="选择难度"><button data-level="0" class="selected" aria-pressed="true">普通<small>轻松闯关</small></button><button data-level="1" aria-pressed="false">冒险<small>留意走位</small></button><button data-level="2" aria-pressed="false">王者<small>硬核挑战</small></button></div><button id="start" class="primary">进入天空之城 <span>→</span></button><p class="hint">WASD 移动 · 1/2/3 切换武器 · J 施法 · L 武器技能</p></div></div>
+<div class="overlay hidden" id="growth" role="dialog" aria-modal="true" aria-labelledby="growth-title"><div class="growth-panel"><p class="overline">ROOM CLEAR · 战斗已暂停</p><h2 id="growth-title">拾取星辉 · 三选一</h2><p id="growth-current"></p><div id="growth-choices"></div><p class="hint">局内词条作用于三种武器 · 重开清空 · 鼠标选择，或 Tab + Enter</p></div></div>
 <div class="overlay hidden" id="modal"><div class="panel compact"><p class="overline" id="result-sub"></p><h2 id="result-title"></h2><p id="result-text"></p><button id="resume" class="primary">继续冒险</button><button id="retry" class="primary">再来一局</button><button id="home" class="secondary">返回标题 · 切换难度</button></div></div></section>
 <footer><div><kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd> 移动 <kbd>1/2/3</kbd> 换武器 <kbd>J</kbd> 施法 <kbd>K</kbd> 跳跃 <kbd>L</kbd> 武器技能 <kbd>U</kbd> 冰环 <kbd>空格</kbd> 冲刺 <kbd>H</kbd> 药水</div><p>清场后进入右侧光门 · 红圈出现时走开、跳跃或冲刺 · 切出窗口自动暂停</p></footer></main><script>"use strict";
 // Pure combat rules shared by the browser and Node regression tests.
@@ -82,6 +95,48 @@ const SkyCombat = (() => {
     dash: { name: "冲刺", cooldown: 1.2 },
     jump: { name: "跳跃", cooldown: 0.95 },
   };
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const difficulties = [
+    { name: "普通", hp: 1, dmg: 0.85, speed: 0.9, wind: 1.15, defense: 0 },
+    { name: "冒险", hp: 1.2, dmg: 1.25, speed: 1.12, wind: 0.9, defense: 8 },
+    { name: "王者", hp: 1.4, dmg: 1.7, speed: 1.4, wind: 0.7, defense: 16 },
+  ];
+  const defenses = { dragon: 0, mage: 0, golem: 15, boss: 10 };
+  const upgrades = [
+    { id: "power", name: "重铸 · 强攻", description: "攻击 +25% 基础值；技能冷却 +8% 基础值", attack: 0.25, crit: 0, haste: -0.08 },
+    { id: "crit", name: "星晶 · 会心", description: "暴击率 +15 个百分点；暴伤 +0.2 倍；攻击 −5% 基础值", attack: -0.05, crit: 0.15, critDamage: 0.2, haste: 0 },
+    { id: "haste", name: "轻羽 · 速咏", description: "技能冷却 −20% 基础值；攻击 −5% 基础值（不影响普攻间隔）", attack: -0.05, crit: 0, haste: 0.2 },
+  ];
+  function stats(player) {
+    return {
+      attack: weapons[player.weapon].attack * clamp(player.attackScale ?? 1, 0.5, 2.5),
+      critChance: clamp(player.critChance ?? 0, 0, 0.75),
+      critMultiplier: clamp(player.critMultiplier ?? 1.5, 1, 2.5),
+      cooldownScale: clamp(1 - (player.haste ?? 0), 0.4, 1.5),
+    };
+  }
+  function cooldown(player, base) {
+    return Math.max(0.1, base * stats(player).cooldownScale);
+  }
+  function applyUpgrade(player, id) {
+    const u = upgrades.find(u => u.id === id);
+    if (!u) return false;
+    player.attackScale = clamp((player.attackScale ?? 1) + u.attack, 0.5, 2.5);
+    player.critChance = clamp((player.critChance ?? 0) + u.crit, 0, 0.75);
+    player.critMultiplier = clamp((player.critMultiplier ?? 1.5) + (u.critDamage ?? 0), 1, 2.5);
+    player.haste = clamp((player.haste ?? 0) + u.haste, -0.5, 0.6);
+    (player.upgrades ??= []).push(id);
+    return true;
+  }
+  function applyDamage(target, spec) {
+    const damage = calculateDamage(spec, target.defense ?? 0);
+    const applied = Math.min(Math.max(0, target.hp), damage);
+    target.hp = Math.max(0, target.hp - applied);
+    return { damage, applied };
+  }
+  function comboRank(combo) {
+    return combo >= 30 ? "S · 超凡" : combo >= 15 ? "A · 华丽" : combo >= 8 ? "B · 熟练" : combo >= 3 ? "C · 起势" : "D · 初击";
+  }
   // Freeze recursively so extensions cannot accidentally mutate shared configuration.
   function freeze(value) {
     Object.values(value).forEach((v) => {
@@ -91,6 +146,9 @@ const SkyCombat = (() => {
   }
   freeze(weapons);
   freeze(skills);
+  freeze(difficulties);
+  freeze(defenses);
+  freeze(upgrades);
   function switchWeapon(player, id) {
     if (!weapons[id] || player.weapon === id) return false;
     player.weapon = id;
@@ -110,8 +168,9 @@ const SkyCombat = (() => {
       skill === "basic"
         ? [1, 1.12, 1.35][player.chain || 0]
         : config.multiplier;
-    const attack = weapon.attack * (player.attackScale ?? 1);
-    const critical = rng() < (player.critChance ?? 0);
+    const panel = stats(player);
+    const attack = panel.attack;
+    const critical = rng() < panel.critChance;
     return {
       ...config,
       weapon: player.weapon,
@@ -119,20 +178,20 @@ const SkyCombat = (() => {
       attack,
       multiplier,
       critical,
-      criticalMultiplier: player.critMultiplier ?? 1.5,
+      criticalMultiplier: panel.critMultiplier,
       face: player.face,
       x: player.x,
       y: player.y,
       color: weapon.color,
     };
   }
-  function calculateDamage(spec) {
+  function calculateDamage(spec, defense = 0) {
     return Math.max(
       0,
       Math.round(
         spec.attack *
           spec.multiplier *
-          (spec.critical ? spec.criticalMultiplier : 1),
+          (spec.critical ? spec.criticalMultiplier : 1) * 100 / (100 + clamp(defense, 0, 100)),
       ),
     );
   }
@@ -183,6 +242,7 @@ const SkyCombat = (() => {
   return Object.freeze({
     weapons,
     skills,
+    difficulties, defenses, upgrades, stats, cooldown, applyUpgrade, applyDamage, comboRank,
     switchWeapon,
     attackSpec,
     calculateDamage,
@@ -211,6 +271,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
   const {
     weapons,
     skills,
+    difficulties, defenses, upgrades, stats, cooldown, applyUpgrade, applyDamage, comboRank,
     switchWeapon,
     attackSpec,
     calculateDamage,
@@ -229,11 +290,6 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     );
   }
   const names = ["龙卫门廊", "悬空回廊", "石像工坊", "城主大厅"];
-  const difficulties = [
-    { name: "普通", hp: 1, dmg: 1, speed: 1, wind: 1 },
-    { name: "冒险", hp: 1.35, dmg: 1.35, speed: 1.12, wind: 0.88 },
-    { name: "王者", hp: 1.8, dmg: 1.7, speed: 1.25, wind: 0.75 },
-  ];
   let level = 0,
     mode = "menu",
     room = 0,
@@ -246,6 +302,8 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     keys = new Set(),
     time = 0,
     clock = 0,
+    combatSeconds = 0,
+    totalDamage = 0,
     kills = 0,
     combo = 0,
     maxCombo = 0,
@@ -284,7 +342,9 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
       job: "魔法师",
       weapon: "staff",
       attackScale: 1,
-      critChance: 0,
+      critChance: 0.1,
+      haste: 0,
+      upgrades: [],
       critMultiplier: 1.5,
       hurt: 0,
       animationTime: 0,
@@ -317,6 +377,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
       y,
       hp,
       max: hp,
+      defense: defenses[type] + difficulties[level].defense,
       face: -1,
       cd: rand(0.7, 1.5),
       stun: 0,
@@ -353,6 +414,10 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     lastAnimation = "idle";
     room = 0;
     clock = 0;
+    combatSeconds = 0;
+    totalDamage = 0;
+    time = 0;
+    comboUntil = 0;
     kills = 0;
     combo = 0;
     maxCombo = 0;
@@ -361,6 +426,8 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     loadRoom();
     $("#menu").classList.add("hidden");
     $("#modal").classList.add("hidden");
+    $("#growth").classList.add("hidden");
+    $("#pause").textContent = "暂停 Esc";
     canvas.focus();
     tone(530, 0.2, "triangle");
   }
@@ -384,8 +451,52 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     $("#result-text").textContent =
       kind === "pause"
         ? "休息一下，锅盖还在。点击继续或按 Esc 返回。"
-        : `${difficulties[level].name} · ${Math.floor(clock / 60)} 分 ${Math.floor(clock % 60)} 秒 · 击败 ${kills} · 最高 ${maxCombo} 连击`;
+        : `${difficulties[level].name} · ${Math.floor(clock / 60)} 分 ${Math.floor(clock % 60)} 秒 · 击败 ${kills} · 最高 ${maxCombo} 连击\n总伤害 ${totalDamage.toFixed(0)} · 有效战斗 ${combatSeconds.toFixed(1)} 秒 · 秒伤 ${(totalDamage / Math.max(0.001, combatSeconds)).toFixed(1)}\n取得升级：${p.upgrades.map(id => upgrades.find(u => u.id === id).name).join(" / ") || "无"}\n伤害按实扣血；战斗时间仅统计有存活敌人的游玩帧，排除暂停、成长和清房走门。`;
     $("#pause").textContent = kind === "pause" ? "继续 Esc" : "暂停 Esc";
+  }
+  function panelText(player) {
+    const v = stats(player);
+    return `攻击 ${v.attack.toFixed(1)} · 暴击 ${Math.round(v.critChance * 100)}% · 暴伤 ${v.critMultiplier.toFixed(1)}倍 · L ${cooldown(player, weapons[player.weapon].skill.cooldown).toFixed(2)}s / U ${cooldown(player, skills.frost.cooldown).toFixed(2)}s`;
+  }
+  function showGrowth() {
+    mode = "growth";
+    keys.clear();
+    $("#growth").classList.remove("hidden");
+    $("#growth-current").textContent = `当前 ${weapons[p.weapon].name}：${panelText(p)}`;
+    $("#growth-choices").replaceChildren();
+    for (const u of upgrades) {
+      const preview = structuredClone(p);
+      applyUpgrade(preview, u.id);
+      const b = document.createElement("button");
+      b.dataset.upgrade = u.id;
+      const title = document.createElement("strong");
+      title.textContent = u.name;
+      const description = document.createElement("span");
+      description.textContent = u.description;
+      const after = document.createElement("small");
+      after.textContent = "选择后：" + panelText(preview);
+      b.append(title, description, after);
+      b.onclick = () => {
+        if (mode !== "growth") return;
+        const before = stats(p);
+        applyUpgrade(p, u.id);
+        emitCombat("upgrade", { id: u.id, before, after: stats(p) });
+        $("#growth").classList.add("hidden");
+        mode = "play";
+        keys.clear();
+        canvas.focus();
+        float(480, 240, "成长完成！进入右侧光门", "#d6fbd0", 2, 23);
+      };
+      $("#growth-choices").append(b);
+    }
+    $("#growth-choices button").focus();
+  }
+  function breakCombo(reason) {
+    if (combo > 0) {
+      float(800, 185, `断连 · ${reason}（${combo}）`, "#ffb5ac", 1.3, 16);
+      emitCombat("combo-break", { count: combo, reason });
+      combo = 0;
+    }
   }
   function pause() {
     if (mode === "play") {
@@ -421,18 +532,19 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
   }
   function hit(e, spec, knock = 12, freeze = 0) {
     if (e.hp <= 0) return;
-    const damage = calculateDamage(spec),
-      applied = Math.min(e.hp, damage);
-    e.hp -= damage;
+    const { damage, applied } = applyDamage(e, spec);
+    totalDamage += applied;
     emitCombat("damage", {
       weapon: spec.weapon,
       skill: spec.skill,
       attack: spec.attack,
       multiplier: spec.multiplier,
       critical: spec.critical,
+      criticalMultiplier: spec.criticalMultiplier,
       damage,
       applied,
       target: e.type,
+      defense: e.defense,
     });
     e.x = clamp(e.x + spec.face * knock, 50, 885);
     e.stun = Math.max(e.stun, freeze || 0.25);
@@ -441,7 +553,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     maxCombo = Math.max(maxCombo, combo);
     comboUntil = time + 2;
     emitCombat("combo", { count: combo, max: maxCombo });
-    float(e.x, e.y - 64, Math.round(damage), "#ffe9a8");
+    float(e.x, e.y - 64, `${spec.critical ? "暴击！" : spec.skill !== "basic" ? "技能 " : ""}${damage}`, spec.critical ? "#ffce69" : spec.skill !== "basic" ? "#aeefff" : "#fff4df", 0.8, spec.critical ? 23 : 17);
     particles(e.x, e.y - 35, "#ffe4a3");
     shake = Math.max(shake, 3);
     tone(180 + combo * 7);
@@ -463,7 +575,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     p.inv = 0.8;
     p.hurt = 0.25;
     shake = 8;
-    combo = 0;
+    breakCombo("受击");
     float(p.x, p.y - 65, "−" + Math.round(dmg), "#ff9292");
     particles(p.x, p.y - 32, "#ff817e");
     tone(85, 0.17, "sawtooth");
@@ -519,7 +631,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     }
     if (key === "KeyK" && p.z === 0 && p.cd.jump <= 0) {
       p.vz = 335;
-      p.cd.jump = skills.jump.cooldown;
+      p.cd.jump = cooldown(p, skills.jump.cooldown);
       tone(320, 0.12, "triangle");
     }
     if (key === "Space" && p.cd.dash <= 0) {
@@ -535,15 +647,15 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
       p.dy = dy / len;
       p.dash = 0.2;
       p.inv = Math.max(p.inv, 0.28);
-      p.cd.dash = skills.dash.cooldown;
+      p.cd.dash = cooldown(p, skills.dash.cooldown);
       tone(210, 0.1, "triangle");
     }
     if (key === "KeyL" && p.cd.lid <= 0) {
-      p.cd.lid = weapons[p.weapon].skill.cooldown;
+      p.cd.lid = cooldown(p, weapons[p.weapon].skill.cooldown);
       cast(attackSpec(p, "special"));
     }
     if (key === "KeyU" && p.cd.frost <= 0) {
-      p.cd.frost = skills.frost.cooldown;
+      p.cd.frost = cooldown(p, skills.frost.cooldown);
       p.attack = 0.3;
       effects.push({ kind: "frost", x: p.x, y: p.y, life: 0.65, max: 0.65 });
       const spec = attackSpec(p, "frost");
@@ -674,7 +786,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     if (boss && e.hp < e.max * 0.5) e.cd *= 0.75;
   }
   function update(dt) {
-    if (mode === "pause" || mode === "win" || mode === "lose") return;
+    if (mode === "pause" || mode === "growth" || mode === "win" || mode === "lose") return;
     time += dt;
     effects = effects.filter((f) => f.life > 0);
     for (const f of effects) {
@@ -689,15 +801,16 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     shake = Math.max(0, shake - dt * 30);
     if (mode !== "play") return;
     clock += dt;
+    if (enemies.some(e => e.hp > 0)) combatSeconds += dt;
     doorLock -= dt;
     p.inv -= dt;
     p.hurt -= dt;
     p.animationTime += dt;
-    p.hitCd -= dt;
+    p.hitCd = Math.max(0, p.hitCd - dt);
     p.attack -= dt;
     p.dash -= dt;
     for (const k in p.cd) p.cd[k] = Math.max(0, p.cd[k] - dt);
-    if (time > comboUntil) combo = 0;
+    if (time > comboUntil) breakCombo("超时");
     let dx =
         (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
         (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0),
@@ -765,6 +878,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
         }
       }
     }
+    if (mode !== "play") return;
     hazards = hazards.filter((h) => h.life > 0 && h.source.hp > 0);
     for (const s of shots) {
       const previousX = s.x,
@@ -800,7 +914,8 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
         end(true);
         return;
       }
-      float(480, 240, "清场！进入右侧光门", "#d6fbd0", 2, 23);
+      showGrowth();
+      return;
     }
     if (clear && p.x > 875 && Math.abs(p.y - 392) < 75 && doorLock <= 0) {
       room++;
@@ -1441,18 +1556,21 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
       "right",
     );
     const weapon = weapons[p.weapon];
-    rect(12, 72, 250, 56, "#101c31df");
+    rect(12, 72, 265, 105, "#101c31df");
     text(
-      `[${weapon.key}] ${weapon.name} · 攻击 ${weapon.attack} · 间隔 ${weapon.interval.toFixed(2)}s`,
+      `[${weapon.key}] ${weapon.name} · 攻击 ${stats(p).attack.toFixed(1)} · 间隔 ${weapon.interval.toFixed(2)}s`,
       22,
       93,
       12,
       weapon.color,
     );
     text(`1/2/3 切换 · ${weapon.description}`, 22, 116, 11, "#d3dce8");
-    if (combo > 1) {
+    text(`暴击 ${Math.round(stats(p).critChance * 100)}% · 暴伤 ${stats(p).critMultiplier.toFixed(1)}倍 · 成长 ${p.upgrades.length}`, 22, 136, 11, "#f0d49a");
+    text(`L ${cooldown(p, weapon.skill.cooldown).toFixed(2)}s / U ${cooldown(p, skills.frost.cooldown).toFixed(2)}s · 实扣 ${totalDamage.toFixed(0)}`, 22, 155, 11, "#b7c9db");
+    text(`难度防御 +${difficulties[level].defense} · 石像 +15 / 领主 +10`, 22, 169, 10, "#b7c9db");
+    if (combo > 0) {
       text(`${combo}`, 902, 129, 34, "#ffe5ad", "right");
-      text("COMBO", 902, 150, 12, "#dfb66b", "right");
+      text(comboRank(combo), 902, 150, 12, "#dfb66b", "right");
     }
     const boss = enemies.find((e) => e.type === "boss" && e.hp > 0);
     if (boss) {
@@ -1487,6 +1605,7 @@ if (typeof module !== "undefined") module.exports = SkyCombat;
     room,
     level,
     clock,
+    combatSeconds, totalDamage, panel: stats(p),
     kills,
     combo,
     maxCombo,

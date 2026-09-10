@@ -17,6 +17,7 @@
   const {
     weapons,
     skills,
+    difficulties, defenses, upgrades, stats, cooldown, applyUpgrade, applyDamage, comboRank,
     switchWeapon,
     attackSpec,
     calculateDamage,
@@ -35,11 +36,6 @@
     );
   }
   const names = ["龙卫门廊", "悬空回廊", "石像工坊", "城主大厅"];
-  const difficulties = [
-    { name: "普通", hp: 1, dmg: 1, speed: 1, wind: 1 },
-    { name: "冒险", hp: 1.35, dmg: 1.35, speed: 1.12, wind: 0.88 },
-    { name: "王者", hp: 1.8, dmg: 1.7, speed: 1.25, wind: 0.75 },
-  ];
   let level = 0,
     mode = "menu",
     room = 0,
@@ -52,6 +48,8 @@
     keys = new Set(),
     time = 0,
     clock = 0,
+    combatSeconds = 0,
+    totalDamage = 0,
     kills = 0,
     combo = 0,
     maxCombo = 0,
@@ -90,7 +88,9 @@
       job: "魔法师",
       weapon: "staff",
       attackScale: 1,
-      critChance: 0,
+      critChance: 0.1,
+      haste: 0,
+      upgrades: [],
       critMultiplier: 1.5,
       hurt: 0,
       animationTime: 0,
@@ -123,6 +123,7 @@
       y,
       hp,
       max: hp,
+      defense: defenses[type] + difficulties[level].defense,
       face: -1,
       cd: rand(0.7, 1.5),
       stun: 0,
@@ -159,6 +160,10 @@
     lastAnimation = "idle";
     room = 0;
     clock = 0;
+    combatSeconds = 0;
+    totalDamage = 0;
+    time = 0;
+    comboUntil = 0;
     kills = 0;
     combo = 0;
     maxCombo = 0;
@@ -167,6 +172,8 @@
     loadRoom();
     $("#menu").classList.add("hidden");
     $("#modal").classList.add("hidden");
+    $("#growth").classList.add("hidden");
+    $("#pause").textContent = "暂停 Esc";
     canvas.focus();
     tone(530, 0.2, "triangle");
   }
@@ -190,8 +197,52 @@
     $("#result-text").textContent =
       kind === "pause"
         ? "休息一下，锅盖还在。点击继续或按 Esc 返回。"
-        : `${difficulties[level].name} · ${Math.floor(clock / 60)} 分 ${Math.floor(clock % 60)} 秒 · 击败 ${kills} · 最高 ${maxCombo} 连击`;
+        : `${difficulties[level].name} · ${Math.floor(clock / 60)} 分 ${Math.floor(clock % 60)} 秒 · 击败 ${kills} · 最高 ${maxCombo} 连击\n总伤害 ${totalDamage.toFixed(0)} · 有效战斗 ${combatSeconds.toFixed(1)} 秒 · 秒伤 ${(totalDamage / Math.max(0.001, combatSeconds)).toFixed(1)}\n取得升级：${p.upgrades.map(id => upgrades.find(u => u.id === id).name).join(" / ") || "无"}\n伤害按实扣血；战斗时间仅统计有存活敌人的游玩帧，排除暂停、成长和清房走门。`;
     $("#pause").textContent = kind === "pause" ? "继续 Esc" : "暂停 Esc";
+  }
+  function panelText(player) {
+    const v = stats(player);
+    return `攻击 ${v.attack.toFixed(1)} · 暴击 ${Math.round(v.critChance * 100)}% · 暴伤 ${v.critMultiplier.toFixed(1)}倍 · L ${cooldown(player, weapons[player.weapon].skill.cooldown).toFixed(2)}s / U ${cooldown(player, skills.frost.cooldown).toFixed(2)}s`;
+  }
+  function showGrowth() {
+    mode = "growth";
+    keys.clear();
+    $("#growth").classList.remove("hidden");
+    $("#growth-current").textContent = `当前 ${weapons[p.weapon].name}：${panelText(p)}`;
+    $("#growth-choices").replaceChildren();
+    for (const u of upgrades) {
+      const preview = structuredClone(p);
+      applyUpgrade(preview, u.id);
+      const b = document.createElement("button");
+      b.dataset.upgrade = u.id;
+      const title = document.createElement("strong");
+      title.textContent = u.name;
+      const description = document.createElement("span");
+      description.textContent = u.description;
+      const after = document.createElement("small");
+      after.textContent = "选择后：" + panelText(preview);
+      b.append(title, description, after);
+      b.onclick = () => {
+        if (mode !== "growth") return;
+        const before = stats(p);
+        applyUpgrade(p, u.id);
+        emitCombat("upgrade", { id: u.id, before, after: stats(p) });
+        $("#growth").classList.add("hidden");
+        mode = "play";
+        keys.clear();
+        canvas.focus();
+        float(480, 240, "成长完成！进入右侧光门", "#d6fbd0", 2, 23);
+      };
+      $("#growth-choices").append(b);
+    }
+    $("#growth-choices button").focus();
+  }
+  function breakCombo(reason) {
+    if (combo > 0) {
+      float(800, 185, `断连 · ${reason}（${combo}）`, "#ffb5ac", 1.3, 16);
+      emitCombat("combo-break", { count: combo, reason });
+      combo = 0;
+    }
   }
   function pause() {
     if (mode === "play") {
@@ -227,18 +278,19 @@
   }
   function hit(e, spec, knock = 12, freeze = 0) {
     if (e.hp <= 0) return;
-    const damage = calculateDamage(spec),
-      applied = Math.min(e.hp, damage);
-    e.hp -= damage;
+    const { damage, applied } = applyDamage(e, spec);
+    totalDamage += applied;
     emitCombat("damage", {
       weapon: spec.weapon,
       skill: spec.skill,
       attack: spec.attack,
       multiplier: spec.multiplier,
       critical: spec.critical,
+      criticalMultiplier: spec.criticalMultiplier,
       damage,
       applied,
       target: e.type,
+      defense: e.defense,
     });
     e.x = clamp(e.x + spec.face * knock, 50, 885);
     e.stun = Math.max(e.stun, freeze || 0.25);
@@ -247,7 +299,7 @@
     maxCombo = Math.max(maxCombo, combo);
     comboUntil = time + 2;
     emitCombat("combo", { count: combo, max: maxCombo });
-    float(e.x, e.y - 64, Math.round(damage), "#ffe9a8");
+    float(e.x, e.y - 64, `${spec.critical ? "暴击！" : spec.skill !== "basic" ? "技能 " : ""}${damage}`, spec.critical ? "#ffce69" : spec.skill !== "basic" ? "#aeefff" : "#fff4df", 0.8, spec.critical ? 23 : 17);
     particles(e.x, e.y - 35, "#ffe4a3");
     shake = Math.max(shake, 3);
     tone(180 + combo * 7);
@@ -269,7 +321,7 @@
     p.inv = 0.8;
     p.hurt = 0.25;
     shake = 8;
-    combo = 0;
+    breakCombo("受击");
     float(p.x, p.y - 65, "−" + Math.round(dmg), "#ff9292");
     particles(p.x, p.y - 32, "#ff817e");
     tone(85, 0.17, "sawtooth");
@@ -325,7 +377,7 @@
     }
     if (key === "KeyK" && p.z === 0 && p.cd.jump <= 0) {
       p.vz = 335;
-      p.cd.jump = skills.jump.cooldown;
+      p.cd.jump = cooldown(p, skills.jump.cooldown);
       tone(320, 0.12, "triangle");
     }
     if (key === "Space" && p.cd.dash <= 0) {
@@ -341,15 +393,15 @@
       p.dy = dy / len;
       p.dash = 0.2;
       p.inv = Math.max(p.inv, 0.28);
-      p.cd.dash = skills.dash.cooldown;
+      p.cd.dash = cooldown(p, skills.dash.cooldown);
       tone(210, 0.1, "triangle");
     }
     if (key === "KeyL" && p.cd.lid <= 0) {
-      p.cd.lid = weapons[p.weapon].skill.cooldown;
+      p.cd.lid = cooldown(p, weapons[p.weapon].skill.cooldown);
       cast(attackSpec(p, "special"));
     }
     if (key === "KeyU" && p.cd.frost <= 0) {
-      p.cd.frost = skills.frost.cooldown;
+      p.cd.frost = cooldown(p, skills.frost.cooldown);
       p.attack = 0.3;
       effects.push({ kind: "frost", x: p.x, y: p.y, life: 0.65, max: 0.65 });
       const spec = attackSpec(p, "frost");
@@ -480,7 +532,7 @@
     if (boss && e.hp < e.max * 0.5) e.cd *= 0.75;
   }
   function update(dt) {
-    if (mode === "pause" || mode === "win" || mode === "lose") return;
+    if (mode === "pause" || mode === "growth" || mode === "win" || mode === "lose") return;
     time += dt;
     effects = effects.filter((f) => f.life > 0);
     for (const f of effects) {
@@ -495,15 +547,16 @@
     shake = Math.max(0, shake - dt * 30);
     if (mode !== "play") return;
     clock += dt;
+    if (enemies.some(e => e.hp > 0)) combatSeconds += dt;
     doorLock -= dt;
     p.inv -= dt;
     p.hurt -= dt;
     p.animationTime += dt;
-    p.hitCd -= dt;
+    p.hitCd = Math.max(0, p.hitCd - dt);
     p.attack -= dt;
     p.dash -= dt;
     for (const k in p.cd) p.cd[k] = Math.max(0, p.cd[k] - dt);
-    if (time > comboUntil) combo = 0;
+    if (time > comboUntil) breakCombo("超时");
     let dx =
         (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
         (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0),
@@ -571,6 +624,7 @@
         }
       }
     }
+    if (mode !== "play") return;
     hazards = hazards.filter((h) => h.life > 0 && h.source.hp > 0);
     for (const s of shots) {
       const previousX = s.x,
@@ -606,7 +660,8 @@
         end(true);
         return;
       }
-      float(480, 240, "清场！进入右侧光门", "#d6fbd0", 2, 23);
+      showGrowth();
+      return;
     }
     if (clear && p.x > 875 && Math.abs(p.y - 392) < 75 && doorLock <= 0) {
       room++;
@@ -1247,18 +1302,21 @@
       "right",
     );
     const weapon = weapons[p.weapon];
-    rect(12, 72, 250, 56, "#101c31df");
+    rect(12, 72, 265, 105, "#101c31df");
     text(
-      `[${weapon.key}] ${weapon.name} · 攻击 ${weapon.attack} · 间隔 ${weapon.interval.toFixed(2)}s`,
+      `[${weapon.key}] ${weapon.name} · 攻击 ${stats(p).attack.toFixed(1)} · 间隔 ${weapon.interval.toFixed(2)}s`,
       22,
       93,
       12,
       weapon.color,
     );
     text(`1/2/3 切换 · ${weapon.description}`, 22, 116, 11, "#d3dce8");
-    if (combo > 1) {
+    text(`暴击 ${Math.round(stats(p).critChance * 100)}% · 暴伤 ${stats(p).critMultiplier.toFixed(1)}倍 · 成长 ${p.upgrades.length}`, 22, 136, 11, "#f0d49a");
+    text(`L ${cooldown(p, weapon.skill.cooldown).toFixed(2)}s / U ${cooldown(p, skills.frost.cooldown).toFixed(2)}s · 实扣 ${totalDamage.toFixed(0)}`, 22, 155, 11, "#b7c9db");
+    text(`难度防御 +${difficulties[level].defense} · 石像 +15 / 领主 +10`, 22, 169, 10, "#b7c9db");
+    if (combo > 0) {
       text(`${combo}`, 902, 129, 34, "#ffe5ad", "right");
-      text("COMBO", 902, 150, 12, "#dfb66b", "right");
+      text(comboRank(combo), 902, 150, 12, "#dfb66b", "right");
     }
     const boss = enemies.find((e) => e.type === "boss" && e.hp > 0);
     if (boss) {
@@ -1293,6 +1351,7 @@
     room,
     level,
     clock,
+    combatSeconds, totalDamage, panel: stats(p),
     kills,
     combo,
     maxCombo,
