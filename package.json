@@ -1,0 +1,1 @@
+{"name":"sky-snow-dungeon","version":"1.0.0","private":true,"scripts":{"build":"node build.mjs","test":"node tests/e2e.cjs"},"devDependencies":{"playwright":"1.63.0"}}
