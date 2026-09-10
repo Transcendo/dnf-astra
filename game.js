@@ -28,7 +28,7 @@
     calculateDamage,
     inArea,
     projectileTargets,
-    animationState,
+    animationState, controlHit, canHurt,
   } = SkyCombat;
   let combatEvents = [],
     lastAnimation = "idle";
@@ -64,7 +64,13 @@
     muted = false,
     audio = null,
     last = 0,
-    doorLock = 0;
+    doorLock = 0,
+    hitStop = 0, stopCooldown = 0, transition = 0, reducedFX = false, noShake = false;
+  const FX_LIMIT = 180;
+  function addEffect(effect) {
+    if (effects.length >= FX_LIMIT) effects.shift();
+    effects.push(effect);
+  }
   const rand = (a, b) => a + Math.random() * (b - a),
     clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   function tone(freq = 220, duration = 0.07, type = "square", volume = 0.025) {
@@ -86,6 +92,7 @@
       g.connect(audio.destination);
       o.start();
       o.stop(audio.currentTime + duration);
+      o.onended = () => { o.disconnect(); g.disconnect(); };
     } catch {}
   }
   function makePlayer() {
@@ -136,11 +143,13 @@
       stun: 0,
       flash: 0,
       cast: 0,
-      phase: 0,
+      phase: 0, z: 0, vz: 0, controlUntil: 0, immuneUntil: 0, recovery: 0, enraged: false,
     };
   }
   function loadRoom() {
     clear = false;
+    transition = 0.6; hitStop = 0; stopCooldown = 0; shake = 0;
+    p.casts = [];
     doorLock = 0.6;
     hazards = [];
     shots = [];
@@ -268,11 +277,11 @@
     tone(win ? 780 : 130, 0.5, "triangle");
   }
   function float(x, y, text, color = "#fff", life = 0.65, size = 17) {
-    effects.push({ kind: "text", x, y, text, color, life, max: life, size });
+    addEffect({ kind: "text", x, y, text, color, life, max: life, size });
   }
   function particles(x, y, color, count = 8) {
-    for (let i = 0; i < count; i++)
-      effects.push({
+    for (let i = 0; i < (reducedFX ? Math.ceil(count / 4) : count); i++)
+      addEffect({
         kind: "pixel",
         x,
         y,
@@ -299,8 +308,14 @@
       target: e.type,
       defense: e.defense,
     });
-    e.x = clamp(e.x + spec.face * knock, 50, 885);
-    e.stun = Math.max(e.stun, freeze || 0.25);
+    const control = controlHit(e, spec, time, freeze);
+    if (control !== "immune") {
+      e.x = clamp(e.x + (spec.weapon === "broom" && spec.skill === "special" ? (spec.x - e.x) * 0.35 : spec.face * knock), 50, 885);
+      if (control !== "stagger") float(e.x, e.y - 110, {launch:"浮空", pursuit:"空中追击", freeze:"冰冻"}[control], "#a8edff", 0.5, 14);
+    }
+    emitCombat("control", { target: e.type, control, z: e.z, until: e.controlUntil });
+    if (stopCooldown <= 0) { hitStop = spec.critical ? 0.045 : 0.022; stopCooldown = 0.18; }
+    addEffect({kind:"wave", x:e.x, y:e.y - e.z - 30, color:freeze ? "#99f4ff" : spec.critical ? "#ffd36f" : spec.color, life:0.24, max:0.24, r:spec.critical ? 40 : 22});
     e.flash = 0.13;
     combo++;
     maxCombo = Math.max(maxCombo, combo);
@@ -309,8 +324,13 @@
     float(e.x, e.y - 64, `${spec.critical ? "暴击！" : spec.skill !== "basic" ? "技能 " : ""}${damage}`, spec.critical ? "#ffce69" : spec.skill !== "basic" ? "#aeefff" : "#fff4df", 0.8, spec.critical ? 23 : 17);
     particles(e.x, e.y - 35, "#ffe4a3");
     shake = Math.max(shake, 3);
-    tone(180 + combo * 7);
+    tone(spec.critical ? 720 : freeze ? 980 : 180 + combo * 7, 0.08, spec.critical ? "triangle" : "sine");
     if (e.hp <= 0) {
+      if (e.type === "boss") {
+        addEffect({kind:"wave", x:e.x, y:e.y-40, r:240, color:"#ffe1a0", life:1.2, max:1.2});
+        float(e.x, e.y-150, "领主击破", "#ffe1a0", 1.2, 30);
+        tone(110, 0.7, "sawtooth"); shake = 10;
+      }
       kills++;
       emitCombat("kill", {
         target: e.type,
@@ -322,8 +342,8 @@
       if (kills % 3 === 0) drops.push({ x: e.x, y: e.y });
     }
   }
-  function hurt(dmg) {
-    if (mode !== "play" || p.inv > 0 || p.z > 22) return;
+  function hurt(dmg, antiAir = false) {
+    if (mode !== "play" || !canHurt(p.z, p.inv, antiAir)) return;
     p.hp = Math.max(0, p.hp - dmg);
     p.inv = 0.8;
     p.hurt = 0.25;
@@ -343,7 +363,7 @@
   }
   function releaseCast(spec) {
     if (spec.skill === "frost") {
-      effects.push({ kind: "frost", x: spec.x, y: spec.y, life: 0.65, max: 0.65 });
+      addEffect({ kind: "frost", x: spec.x, y: spec.y, life: 0.65, max: 0.65 });
       for (const e of enemies)
         if (Math.hypot(e.x - spec.x, (e.y - spec.y) * 1.6) < skills.frost.range)
           hit(e, spec, 8, e.type === "boss" ? 0.7 : 1.8);
@@ -361,13 +381,13 @@
       });
     } else {
       const burst = spec.shape === "burst";
-      effects.push({
+      addEffect({
         kind: "magic",
         x: spec.x + (burst ? spec.face * spec.offset : 0),
         y: spec.y,
         range: spec.range,
         depth: spec.depth,
-        shape: spec.shape,
+        shape: spec.shape, weapon: spec.weapon,
         face: spec.face,
         color: spec.color,
         life: 0.28,
@@ -488,6 +508,16 @@
     $("#sound").setAttribute("aria-pressed", String(muted));
     canvas.focus();
   };
+  $("#effects").onclick = () => {
+    reducedFX = !reducedFX;
+    $("#effects").textContent = "特效：" + (reducedFX ? "减弱" : "完整");
+    $("#effects").setAttribute("aria-pressed", String(reducedFX)); canvas.focus();
+  };
+  $("#shake").onclick = () => {
+    noShake = !noShake;
+    $("#shake").textContent = "震动：" + (noShake ? "关" : "开");
+    $("#shake").setAttribute("aria-pressed", String(noShake)); canvas.focus();
+  };
   document.querySelectorAll("[data-level]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -523,7 +553,7 @@
       damage:
         (boss ? 26 : mage ? 14 : e.type === "golem" ? 20 : 11) *
         difficulties[level].dmg,
-      lightning: aimed,
+      lightning: aimed, antiAir: aimed,
       source: e,
     });
     if (boss && e.hp < e.max * 0.5) {
@@ -534,10 +564,12 @@
         life: duration + 0.25,
         max: duration + 0.25,
         damage: 22 * difficulties[level].dmg,
-        lightning: true,
+        lightning: true, antiAir: true,
         source: e,
       });
     }
+    emitCombat("telegraph", {target:e.type, antiAir:aimed, duration});
+    e.recovery = duration + (boss ? 0.65 : 0.3);
     e.cast = duration;
     e.phase++;
     e.cd =
@@ -547,6 +579,9 @@
   }
   function update(dt) {
     if (mode === "pause" || mode === "growth" || mode === "win" || mode === "lose") return;
+    if (mode === "play" && hitStop > 0) { hitStop = Math.max(0, hitStop - dt); return; }
+    stopCooldown = Math.max(0, stopCooldown - dt);
+    transition = Math.max(0, transition - dt);
     time += dt;
     effects = effects.filter((f) => f.life > 0);
     for (const f of effects) {
@@ -606,12 +641,23 @@
     if (keys.has("KeyJ")) action("KeyJ");
     for (const e of enemies) {
       if (e.hp <= 0) continue;
+      if (e.type === "boss" && !e.enraged && e.hp <= e.max * 0.5) {
+        e.enraged = true; e.recovery = 1.1; e.cd = 1.1;
+        hazards = hazards.filter(h => h.source !== e);
+        float(480, 205, "雷霆觉醒 · 紫圈可对空", "#e2b7ff", 1.1, 23);
+        emitCombat("boss-phase", {phase:2}); tone(160, 0.4, "sawtooth");
+      }
+      e.recovery = Math.max(0, e.recovery - dt);
+      if (e.z > 0) {
+        e.z = Math.max(0, e.z + e.vz * dt); e.vz -= 850 * dt;
+        if (!e.z) e.vz = 0;
+      }
       e.cd -= dt;
       e.stun -= dt;
       e.flash -= dt;
       e.cast -= dt;
       e.face = p.x >= e.x ? 1 : -1;
-      if (e.stun > 0 || e.cast > 0) continue;
+      if (e.stun > 0 || e.z > 0 || e.cast > 0 || e.recovery > 0) continue;
       const ex = p.x - e.x,
         ey = p.y - e.y,
         dist = Math.hypot(ex, ey);
@@ -629,8 +675,9 @@
       if (h.life <= 0 && !h.done) {
         h.done = true;
         if (h.source.hp > 0) {
-          if (Math.hypot(p.x - h.x, (p.y - h.y) * 1.5) < h.r) hurt(h.damage);
-          effects.push({
+          if (Math.hypot(p.x - h.x, (p.y - h.y) * 1.5) < h.r) hurt(h.damage, h.antiAir);
+          emitCombat("hazard-resolve", {antiAir:h.antiAir, playerZ:p.z, hp:p.hp});
+          addEffect({
             kind: h.lightning ? "bolt" : "impact",
             x: h.x,
             y: h.y,
@@ -855,6 +902,7 @@
       );
       rect(461, 218, 44, 54, "#555776");
     }
+    atmosphere();
     const open = clear || mode === "menu";
     rect(888, 293, 45, 159, "#243c58");
     rect(883, 287, 55, 8, "#dbd9bf");
@@ -876,6 +924,29 @@
       for (let i = 0; i < 4; i++) rect(893 + i * 9, 297, 4, 148, "#63798d");
       text("清场开门", 910, 279, 11, "#e1dbbd", "center");
     }
+  }
+  // Procedural layers share the original scenery but give each room its own silhouette.
+  function atmosphere() {
+    c.save(); c.beginPath(); c.rect(0,64,960,242); c.clip();
+    rect(0,64,960,242,["#75d5e91c","#30295a55","#d5903938","#28194d88"][room]);
+    c.globalAlpha = reducedFX ? 0.08 : 0.22;
+    for (let i=0;i<5;i++) cloud(((i*260+time*(8+i*2)-p.x*.07)%1300)-180,110+i%3*45,1.1);
+    c.globalAlpha=1;
+    if (room===0) for (const x of [335,735]) { rect(x,115,7,180,"#dcc89c"); poly([[x+7,120],[x+55,130],[x+43,184],[x+7,173]],"#627caa"); }
+    if (room===1) for (let i=0;i<7;i++) {
+      const x=300+i*82, y=200+Math.sin(time*1.2+i)*16;
+      poly([[x-23,y],[x+24,y-6],[x+9,y+33]],"#6a6c92"); text("◇",x,y-12,20,"#a9eeed","center");
+    }
+    if (room===2) for (const x of [320,590,760]) {
+      rect(x-22,209,44,92,"#736258"); ellipse(x,231,18,29,"#ecb266");
+      c.save();c.translate(x,190);c.rotate(time*.4);c.strokeStyle="#f2c887";c.lineWidth=5;c.strokeRect(-28,-28,56,56);c.restore();
+    }
+    if (room===3) {
+      for(const x of [320,640]) { rect(x,74,8,229,"#ab89c435"); rect(x+3,74,2,229,"#d4baff77"); }
+      c.strokeStyle="#dbc093";c.lineWidth=2;c.beginPath();c.ellipse(483,203,105,105,time*.2,0,Math.PI*2);c.stroke();
+      text("✧",483,163,38,"#f7dca7","center");
+    }
+    c.restore();
   }
   function spriteFrame(preview = false) {
     const state = preview ? "idle" : animationState(p).name;
@@ -1053,7 +1124,7 @@
       s = boss ? 1.65 : golem ? 1.2 : 1;
     ellipse(e.x, e.y, 22 * s, 8 * s, "#17324988");
     c.save();
-    c.translate(Math.round(e.x), Math.round(e.y));
+    c.translate(Math.round(e.x), Math.round(e.y - (e.z || 0)));
     c.scale(e.face * s, s);
     const color =
         e.flash > 0
@@ -1157,17 +1228,20 @@
         e.stun > 0.4 ? "#94e8fa" : "#dcae74",
       );
     }
+    if (e.type === "boss") text(e.cast > 0 ? "蓄力 · 霸体" : e.recovery > 0 ? "恢复窗口" : "霸体", e.x, e.y - 158, 12, "#ffe0a0", "center");
+    else if (time >= e.controlUntil && time < e.immuneUntil) text("脱控", e.x, e.y-98, 12, "#ffd188", "center");
     if (e.cast > 0) text("!", e.x, e.y - 90 * s, 24, "#ffcb8c", "center");
   }
   function render() {
     c.clearRect(0, 0, W, H);
     c.save();
-    if (shake > 0 && mode === "play")
+    if (!noShake && !reducedFX && shake > 0 && mode === "play")
       c.translate(rand(-shake, shake), rand(-shake, shake));
     background();
     for (const h of hazards) {
       ellipse(h.x, h.y, h.r, h.r * 0.55, "#ed66613d");
-      c.strokeStyle = "#ffb09a";
+      c.strokeStyle = h.antiAir ? "#eab0ff" : "#ffb09a";
+      text(h.antiAir ? "雷击 · 对空" : "地震 · 可跳", h.x, h.y + h.r * 0.55 + 14, 11, c.strokeStyle, "center");
       c.lineWidth = 2;
       c.beginPath();
       c.ellipse(h.x, h.y, h.r, h.r * 0.55, 0, 0, Math.PI * 2);
@@ -1206,10 +1280,23 @@
     }
     for (const f of effects) {
       c.save();
-      c.globalAlpha = Math.max(0, f.life / f.max);
+      c.globalAlpha = Math.max(0, f.life / f.max) * (f.kind === "text" ? 1 : reducedFX ? 0.25 : 0.65);
+      if (f.kind === "wave") {
+        c.strokeStyle = f.color; c.lineWidth = 2; c.beginPath();
+        c.ellipse(f.x, f.y, f.r * (1-f.life/f.max), f.r * 0.5 * (1-f.life/f.max), 0, 0, Math.PI*2); c.stroke();
+      }
       if (f.kind === "text") text(f.text, f.x, f.y, f.size, f.color, "center");
       if (f.kind === "pixel") rect(f.x, f.y, 4, 4, f.color);
       if (f.kind === "magic") {
+        if (f.weapon === "staff" && f.shape === "burst") {
+          c.strokeStyle = f.color; c.lineWidth = 2;
+          c.beginPath(); c.moveTo(f.x+45, f.y-170); c.lineTo(f.x, f.y-20); c.stroke();
+          for (let i=0;i<6;i++) { const a=i*Math.PI/3; ellipse(f.x+Math.cos(a)*f.range, f.y+Math.sin(a)*f.depth-18,4,4,f.color); }
+        }
+        if (f.weapon === "broom") {
+          c.strokeStyle = f.color; c.lineWidth = 2;
+          for (let i=0;i<3;i++) { c.beginPath(); c.ellipse(f.x, f.y-15-i*16, f.range*(1-i*.18), f.depth*.5, (1-f.life/f.max)*.3, 0, Math.PI*1.7); c.stroke(); }
+        }
         c.strokeStyle = f.color;
         c.lineWidth = 5;
         c.beginPath();
@@ -1284,6 +1371,7 @@
       if (f.kind === "impact") ellipse(f.x, f.y, f.r, f.r * 0.55, "#ffd0a188");
       c.restore();
     }
+    if (transition > 0) { c.globalAlpha = (reducedFX ? 0.04 : 0.16) * transition / 0.6; rect(0,64,960 * transition / 0.6,432,"#ceeaff"); c.globalAlpha=1; }
     c.restore();
     hud();
   }
@@ -1424,8 +1512,9 @@
     player: JSON.parse(JSON.stringify(p)),
     enemies: enemies
       .filter((e) => e.hp > 0)
-      .map(({ type, x, y, hp, max, cast }) => ({ type, x, y, hp, max, cast })),
-    hazards: hazards.map(({ x, y, r, life }) => ({ x, y, r, life })),
+      .map(({ type, x, y, hp, max, cast, z, stun, controlUntil, immuneUntil, enraged, recovery }) => ({ type, x, y, hp, max, cast, z, stun, controlUntil, immuneUntil, enraged, recovery })),
+    hazards: hazards.map(({ x, y, r, life, antiAir }) => ({ x, y, r, life, antiAir })),
     shots: shots.length,
+    effects: effects.length, effectLimit: FX_LIMIT, reducedFX, noShake, hitStop,
   });
 })();

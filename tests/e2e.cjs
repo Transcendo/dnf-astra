@@ -10,6 +10,7 @@ fs.mkdirSync("test-results", { recursive: true });
     viewport: { width: 1440, height: 1000 },
   });
   const errors = [];
+  const coverage = new Set();
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (msg) => {
     if (msg.type() === "error") errors.push(msg.text());
@@ -22,7 +23,8 @@ fs.mkdirSync("test-results", { recursive: true });
       if (e.detail.type === "damage") window.damageAudit.push(e.detail);
     });
   });
-  await page.clock.install();
+  await page.clock.install({time: new Date("2026-01-01T00:00:00Z")});
+  await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
   await page.goto("file://" + path.resolve("锅盖雪人.html"));
   const snap = () => page.evaluate(() => skySnowSnapshot());
   let held = new Set();
@@ -77,7 +79,23 @@ fs.mkdirSync("test-results", { recursive: true });
     let state;
     for (let i = 0; i < 2200; i++) {
       state = await snap();
+      if (run === 0 && !visited.has(state.room)) {
+        await page.clock.runFor(650);
+        await page.screenshot({path:`test-results/room-${state.room}.png`});
+      }
       visited.add(state.room);
+      for (const event of state.events) {
+        if (event.type === "control") coverage.add(event.control);
+        if (event.type === "boss-phase") coverage.add("boss-phase");
+        if (event.type === "telegraph" && event.antiAir) coverage.add("antiAir");
+      }
+      assert(state.effects <= state.effectLimit);
+      if (state.enemies.some(e=>e.z>0) && !coverage.has("air-shot")) {
+        await page.screenshot({path:"test-results/air-pursuit.png"}); coverage.add("air-shot");
+      }
+      if (state.hazards.some(h=>h.antiAir) && !coverage.has("warning-shot")) {
+        await page.screenshot({path:"test-results/anti-air.png"}); coverage.add("warning-shot");
+      }
       if (state.mode === "growth") {
         await setKeys([]);
         assert(await page.locator("#growth").isVisible());
@@ -279,6 +297,11 @@ fs.mkdirSync("test-results", { recursive: true });
   );
   await fallback.screenshot({ path: "test-results/fallback.png" });
   await fallback.close();
+  await page.click("#effects"); await page.click("#shake");
+  assert((await snap()).reducedFX); assert((await snap()).noShake);
+  await page.screenshot({path:"test-results/reduced-effects.png"});
+  for (const item of ["launch", "pursuit", "freeze", "immune", "boss-phase", "antiAir"]) assert(coverage.has(item), [...coverage].join(","));
+  fs.writeFileSync("test-results/feel-coverage.json",JSON.stringify([...coverage],null,2));
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify(

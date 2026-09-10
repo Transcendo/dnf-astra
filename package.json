@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test tests/combat.cjs && node tests/e2e.cjs && node tests/sprites.cjs",
-    "assets:prepare": "node tools/prepare-sprites.cjs"
+    "test": "node --test tests/combat.cjs && node tests/e2e.cjs && node tests/sprites.cjs && node tests/telegraph.cjs",
+    "assets:prepare": "node tools/prepare-sprites.cjs",
+    "test:performance": "node tests/performance.cjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

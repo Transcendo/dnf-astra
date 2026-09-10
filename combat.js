@@ -154,6 +154,7 @@ const SkyCombat = (() => {
     return {
       ...config,
       weapon: player.weapon,
+      chain: player.chain,
       skill,
       attack,
       multiplier,
@@ -197,6 +198,20 @@ const SkyCombat = (() => {
       )
       .sort((a, b) => (a.x - b.x) * shot.face);
   }
+  // A fixed control window followed by immunity prevents refresh-locking.
+  function controlHit(e, spec, now, freeze = 0) {
+    if (e.type === "boss" || (now >= (e.controlUntil || 0) && now < (e.immuneUntil || 0))) return "immune";
+    if (!e.controlUntil || now >= e.controlUntil) e.controlUntil = now + 2;
+    e.immuneUntil = e.controlUntil + 1.4;
+    const launch = (spec.skill === "basic" && spec.chain === 2) ||
+      (spec.weapon === "broom" && spec.skill === "special");
+    e.stun = Math.min(e.controlUntil - now, Math.max(e.stun || 0, freeze || 0.22));
+    if (launch && !e.z) { e.z = 1; e.vz = 290; }
+    return freeze ? "freeze" : launch ? "launch" : e.z > 0 ? "pursuit" : "stagger";
+  }
+  function canHurt(height, invulnerability, antiAir) {
+    return invulnerability <= 0 && (antiAir || height <= 22);
+  }
   function animationState(player) {
     return {
       name:
@@ -228,7 +243,7 @@ const SkyCombat = (() => {
     calculateDamage,
     inArea,
     projectileTargets,
-    animationState,
+    animationState, controlHit, canHurt,
   });
 })();
 if (typeof module !== "undefined") module.exports = SkyCombat;

@@ -146,3 +146,22 @@ test("difficulty changes pressure as well as HP and armor", () => {
     assert(b.hp > a.hp && b.dmg > a.dmg && b.speed > a.speed && b.wind < a.wind && b.defense > a.defense);
   }
 });
+test("fixed control budget, launch pursuit, freeze expiry and boss armor", () => {
+  const e = {type:"golem", z:0};
+  const spec = {weapon:"staff", skill:"basic", chain:2};
+  assert.equal(C.controlHit(e,spec,1), "launch");
+  assert.equal(e.vz,290);
+  assert.equal(C.controlHit(e,{...spec,chain:0},1.1), "pursuit");
+  assert.equal(C.controlHit(e,spec,2.9,1.8), "freeze");
+  assert(e.stun <= 0.101);
+  assert.equal(e.controlUntil,3);
+  assert.equal(C.controlHit(e,spec,3.1,1.8), "immune");
+  assert.equal(C.controlHit(e,spec,4.41,1.8), "freeze");
+  assert.equal(C.controlHit({type:"boss"},spec,20,1.8), "immune");
+});
+test("ground attacks can be jumped, lightning cannot; dash protects both", () => {
+  assert.equal(C.canHurt(45,0,false),false);
+  assert.equal(C.canHurt(45,0,true),true);
+  assert.equal(C.canHurt(0,0,false),true);
+  assert.equal(C.canHurt(45,0.1,true),false);
+});
