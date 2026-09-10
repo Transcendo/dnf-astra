@@ -8,7 +8,7 @@ function replaceOnce(source, target, value) {
   return source.replace(target, () => value);
 }
 
-let html = replaceOnce(read("index.html"), '<link rel="stylesheet" href="style.css">', `<style>${read("style.css")}</style>`);
+let html = replaceOnce(read("index.html.in"), '<link rel="stylesheet" href="style.css">', `<style>${read("style.css")}</style>`);
 for (const name of ["combat.js", "sprite-data.js", "game.js"]) {
   let script = read(name);
   if (name === "game.js") {
@@ -23,5 +23,5 @@ for (const name of ["combat.js", "sprite-data.js", "game.js"]) {
 if (/<script\b[^>]*\bsrc\s*=|<link\b[^>]*\bhref\s*=|["']assets\//i.test(html)) {
   throw new Error("Standalone build still contains an external resource reference");
 }
-writeFileSync(new URL("锅盖雪人.html", import.meta.url), html);
+writeFileSync(new URL("index.html", import.meta.url), html);
 console.log("Built standalone offline HTML (scripts, style, background and mage sprites embedded)");

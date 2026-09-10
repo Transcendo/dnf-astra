@@ -25,7 +25,7 @@ fs.mkdirSync("test-results", { recursive: true });
   });
   await page.clock.install({time: new Date("2026-01-01T00:00:00Z")});
   await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
-  await page.goto("file://" + path.resolve("锅盖雪人.html"));
+  await page.goto("file://" + path.resolve("index.html"));
   const snap = () => page.evaluate(() => skySnowSnapshot());
   let held = new Set();
   async function setKeys(want) {
@@ -286,6 +286,7 @@ fs.mkdirSync("test-results", { recursive: true });
   }
   // Network-free build and missing-background fallback both remain playable.
   const fallback = await browser.newPage();
+  await require('./fail-images.cjs')(fallback, ['sky-castle.png']);
   await fallback.route("**/assets/sky-castle.png", (route) => route.abort());
   await fallback.goto("file://" + path.resolve("index.html"));
   await fallback.click("#start");

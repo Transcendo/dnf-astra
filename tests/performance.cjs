@@ -8,7 +8,7 @@ const assert=require('node:assert/strict'), fs=require('node:fs'),path=require('
   EventTarget.prototype.addEventListener=function(...args){if(this===window||this===document) window.qaListeners++;return add.apply(this,args);};
   window.qaFrames=[];let prev=0;function sample(t){if(prev) qaFrames.push(t-prev);prev=t;requestAnimationFrame(sample);}requestAnimationFrame(sample);
  });
- await page.goto('file://'+path.resolve('锅盖雪人.html'));await page.click('#start');
+ await page.goto('file://'+path.resolve('index.html'));await page.click('#start');
  const listenerSamples=[], peaks=[], heap=[];
  const cdp=await page.context().newCDPSession(page);
  for(let run=0;run<30;run++){

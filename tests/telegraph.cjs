@@ -3,7 +3,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),path
  const b=await chromium.launch(),p=await b.newPage({viewport:{width:1024,height:768}});
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.clock.install({time:new Date('2026-01-01')});await p.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
- await p.goto('file://'+path.resolve('锅盖雪人.html'));await p.click('#start');
+ await p.goto('file://'+path.resolve('index.html'));await p.click('#start');
  await p.keyboard.down('d');await p.clock.runFor(1500);await p.keyboard.up('d');
  let s;
  for(let i=0;i<100;i++){s=await p.evaluate(()=>skySnowSnapshot());if(s.hazards.length)break;await p.clock.runFor(40);}

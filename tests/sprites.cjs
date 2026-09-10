@@ -13,7 +13,7 @@ fs.mkdirSync('test-results', {recursive:true});
       await page.clock.install({time:new Date("2026-09-10T00:00:00Z")});
       await page.clock.pauseAt(new Date("2026-09-10T00:00:00Z"));
       await page.context().setOffline(true);
-      await page.goto('file://' + path.resolve('锅盖雪人.html'));
+      await page.goto('file://' + path.resolve('index.html'));
       const snap = () => page.evaluate(() => skySnowSnapshot());
       assert((await snap()).spriteReady);
       assert((await snap()).sceneryReady);
@@ -70,7 +70,7 @@ fs.mkdirSync('test-results', {recursive:true});
       await page.close();
     }
     const audit = await browser.newPage();
-    await audit.goto('file://' + path.resolve('锅盖雪人.html'));
+    await audit.goto('file://' + path.resolve('index.html'));
     const source = fs.readFileSync('assets/mage-snowman.png').toString('base64');
     const bounds = await audit.evaluate(async source => {
       const img = new Image(); img.src = 'data:image/png;base64,' + source; await img.decode();
@@ -95,7 +95,8 @@ fs.mkdirSync('test-results', {recursive:true});
     await audit.close();
     // Missing sprite must take the existing geometric fallback, with controls live.
     const fallback=await browser.newPage();
-    await fallback.route('**/assets/mage-snowman.png',r=>r.abort());
+    await require('./fail-images.cjs')(fallback, ['mage-snowman.png']);
+  await fallback.route('**/assets/mage-snowman.png',r=>r.abort());
     await fallback.goto('file://'+path.resolve('index.html'));
     await fallback.click('#start');
     assert.equal(await fallback.evaluate(()=>skySnowSnapshot().spriteReady),false);

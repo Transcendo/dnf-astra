@@ -11,7 +11,7 @@ const { pathToFileURL } = require('node:url');
   const checks = [], errors = [], requests = [];
   try {
     const artifact = path.join(isolated, 'game.html');
-    fs.copyFileSync('锅盖雪人.html', artifact);
+    fs.copyFileSync('index.html', artifact);
     const context = await browser.newContext({ offline: true, viewport: { width: 1280, height: 720 } });
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(e.message));
@@ -120,7 +120,8 @@ const { pathToFileURL } = require('node:url');
     const fallbackErrors = [], failedAssets = [];
     fallback.on('pageerror', e => fallbackErrors.push(e.message));
     fallback.on('requestfailed', r => failedAssets.push(r.url()));
-    await fallback.route('**/assets/*.png', route => route.abort());
+    await require('./fail-images.cjs')(fallback);
+  await fallback.route('**/assets/*.png', route => route.abort());
     await fallback.goto(pathToFileURL(path.resolve('index.html')).href);
     await fallback.click('#start');
     const state = () => fallback.evaluate(() => skySnowSnapshot());
