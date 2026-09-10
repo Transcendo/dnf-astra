@@ -36,7 +36,7 @@
 
 代码仓库：https://github.com/Transcendo/dnf-astra 。Multica 项目：`dnf-astra`，首期任务 `KARL-10`～`KARL-13`。
 
-克隆后执行 `npm ci` 安装开发依赖，`npm run build` 更新离线 HTML。后续功能通过分支与 PR 维护，所有源文件、原创素材和生成的单文件一起纳入版本控制。GitHub Actions 在 main 推送或 PR 时执行构建和 Chromium 测试，并检查离线 HTML 是否与源码一致。
+克隆后执行 `npm ci` 安装开发依赖，`npm run build` 更新离线 HTML。后续功能由单 Agent 串行维护，本地必要测试通过后直接推送 main，不要求 PR/MR，所有源文件、原创素材和生成的单文件一起纳入版本控制。GitHub Actions 在 main 推送或 PR 时执行构建和 Chromium 测试，并检查离线 HTML 是否与源码一致。
 
 ## 三种武器
 
