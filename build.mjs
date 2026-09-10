@@ -1,35 +1,27 @@
 import { readFileSync, writeFileSync } from "node:fs";
-const html = readFileSync(new URL("index.html", import.meta.url), "utf8")
-  .replace(
-    '<link rel="stylesheet" href="style.css">',
-    () =>
-      "<style>" +
-      readFileSync(new URL("style.css", import.meta.url), "utf8") +
-      "</style>",
-  )
-  .replace(
-    '<script src="combat.js"></script>',
-    () =>
-      "<script>" +
-      readFileSync(new URL("combat.js", import.meta.url), "utf8") +
-      "</script>",
-  )
-  .replace(
-    '<script src="sprite-data.js"></script>',
-    () => "<script>" + readFileSync(new URL("sprite-data.js", import.meta.url), "utf8") + "</script>",
-  )
-  .replace(
-    '<script src="game.js"></script>',
-    () =>
-      "<script>" +
-      readFileSync(new URL("game.js", import.meta.url), "utf8").replace(
-        "assets/sky-castle.png",
-        "data:image/png;base64," +
-          readFileSync(
-            new URL("assets/sky-castle.png", import.meta.url),
-          ).toString("base64"),
-      ).replace("assets/mage-snowman.png", "data:image/png;base64," + readFileSync(new URL("assets/mage-snowman.png", import.meta.url)).toString("base64")) +
-      "</script>",
-  );
+
+const read = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
+function replaceOnce(source, target, value) {
+  if (source.split(target).length !== 2) {
+    throw new Error(`Expected exactly one build reference: ${target}`);
+  }
+  return source.replace(target, () => value);
+}
+
+let html = replaceOnce(read("index.html"), '<link rel="stylesheet" href="style.css">', `<style>${read("style.css")}</style>`);
+for (const name of ["combat.js", "sprite-data.js", "game.js"]) {
+  let script = read(name);
+  if (name === "game.js") {
+    for (const asset of ["sky-castle.png", "mage-snowman.png"]) {
+      const data = readFileSync(new URL(`assets/${asset}`, import.meta.url)).toString("base64");
+      script = replaceOnce(script, `assets/${asset}`, `data:image/png;base64,${data}`);
+    }
+  }
+  html = replaceOnce(html, `<script src="${name}"></script>`, `<script>${script}</script>`);
+}
+// Fail before replacing the last usable artifact if a new resource was not packaged.
+if (/<script\b[^>]*\bsrc\s*=|<link\b[^>]*\bhref\s*=|["']assets\//i.test(html)) {
+  throw new Error("Standalone build still contains an external resource reference");
+}
 writeFileSync(new URL("锅盖雪人.html", import.meta.url), html);
-console.log("Built standalone offline HTML");
+console.log("Built standalone offline HTML (scripts, style, background and mage sprites embedded)");

@@ -342,6 +342,13 @@
       if (kills % 3 === 0) drops.push({ x: e.x, y: e.y });
     }
   }
+  function heal(amount, source) {
+    const before = p.hp;
+    p.hp = Math.min(160, p.hp + amount);
+    const applied = p.hp - before;
+    emitCombat("heal", { source, requested: amount, applied, hp: p.hp });
+    if (applied > 0) float(p.x, p.y - 65, `+${Number(applied.toFixed(1))}`, "#9af4bb");
+  }
   function hurt(dmg, antiAir = false) {
     if (mode !== "play" || !canHurt(p.z, p.inv, antiAir)) return;
     p.hp = Math.max(0, p.hp - dmg);
@@ -446,8 +453,7 @@
     }
     if (key === "KeyH" && p.potions > 0 && p.hp < 160) {
       p.potions--;
-      p.hp = Math.min(160, p.hp + 45);
-      float(p.x, p.y - 70, "+45", "#9af4bb");
+      heal(45, "potion");
       tone(540, 0.2, "sine");
     }
   }
@@ -713,9 +719,8 @@
     }
     for (const d of drops)
       if (Math.hypot(p.x - d.x, p.y - d.y) < 38) {
-        p.hp = Math.min(160, p.hp + 12);
+        heal(12, "drop");
         d.done = true;
-        float(p.x, p.y - 65, "+12", "#9af4bb");
       }
     drops = drops.filter((d) => !d.done);
     if (!clear && enemies.every((e) => e.hp <= 0)) {
@@ -730,7 +735,7 @@
     }
     if (clear && p.x > 875 && Math.abs(p.y - 392) < 75 && doorLock <= 0) {
       room++;
-      p.hp = Math.min(160, p.hp + 18);
+      heal(18, "door");
       loadRoom();
     }
   }

@@ -76,9 +76,10 @@ fs.mkdirSync("test-results", { recursive: true });
       damageWeapons = new Set(),
       specialWeapons = new Set(),
       captured = new Set();
-    let state;
+    let state, minHP = 160;
     for (let i = 0; i < 2200; i++) {
       state = await snap();
+      minHP = Math.min(minHP, state.player.hp);
       if (run === 0 && !visited.has(state.room)) {
         await page.clock.runFor(650);
         await page.screenshot({path:`test-results/room-${state.room}.png`});
@@ -207,6 +208,8 @@ fs.mkdirSync("test-results", { recursive: true });
       rooms: [...visited],
       seconds: state.clock,
       hp: state.player.hp,
+      potionsRemaining: state.player.potions,
+      minHP,
       kills: state.kills,
       upgrades: state.player.upgrades,
       totalDamage: state.totalDamage, combatSeconds: state.combatSeconds,
@@ -266,6 +269,7 @@ fs.mkdirSync("test-results", { recursive: true });
   assert.equal((await snap()).mode, "pause");
   await page.click("#resume");
   for (const viewport of [
+    { width: 1440, height: 900 },
     { width: 1280, height: 720 },
     { width: 1024, height: 768 },
     { width: 1672, height: 941 },
